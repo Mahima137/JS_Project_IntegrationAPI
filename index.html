@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order Management System</title>
+<style>
+  /* Add your CSS styles here */
+</style>
+</head>
+<body>
+  <h1>Order Management System</h1>
+
+  <div>
+    <label for="dishName">Dish Name: </label>
+    <input type="text" id="dishName">
+    <label for="price">Price: </label>
+    <input type="number" id="price">
+    <label for="tableSelect">Table: </label>
+    <input type="number" id="tableNumber" min="1" max="5">
+    <button onclick="addOrder()">Add to Order</button>
+  </div>
+
+  <div id="ordersContainer">
+    <!-- Display orders here -->
+  </div>
+  <script src = "https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script>
+    const apiUrl = 'https://crudcrud.com/api/https://crudcrud.com/api/ba2f8f3ba1c64364868849827f0f2841/orderDetails';
+
+    async function addOrder() {
+      const dishName = document.getElementById('dishName').value;
+      const price = document.getElementById('price').value;
+      const tableNumber = document.getElementById('tableNumber').value;
+
+      if (!dishName || !price || !tableNumber) {
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      const order = { dishName, price };
+      const tableKey = `table${tableNumber}`;
+
+      try {
+        const response = await axios.post(`${apiUrl}/${tableKey}`, order);
+
+        if (response.status === 201) {
+          document.getElementById('dishName').value = '';
+          document.getElementById('price').value = '';
+          document.getElementById('tableNumber').value = '';
+          await syncLocalStorageWithApi();
+          displayOrders();
+        } else {
+          alert('Error adding order.');
+        }
+      } catch (error) {
+        console.error('Error adding order:', error);
+      }
+    }
+
+    async function syncLocalStorageWithApi() {
+      for (let tableNumber = 1; tableNumber <= 5; tableNumber++) {
+        const tableKey = `table${tableNumber}`;
+        const orders = JSON.parse(localStorage.getItem(tableKey)) || [];
+
+        try {
+          const response = await axios.put(`${apiUrl}/${tableKey}`, orders);
+          if (response.status !== 200) {
+            console.error(`Error syncing data for ${tableKey}`);
+          }
+        } catch (error) {
+          console.error(`Error syncing data for ${tableKey}:`, error);
+        }
+      }
+    }
+
+    async function displayOrders() {
+      // ... Rest of your displayOrders code ...
+        const ordersContainer = document.getElementById('ordersContainer');
+        ordersContainer.innerHTML = '';
+
+        for (let tableNumber = 1; tableNumber <= 5; tableNumber++) {
+        const tableKey = `table${tableNumber}`;
+
+        try {
+          const response = await fetch(`${apiUrl}/${tableKey}`);
+          if (response.ok) {
+            const orders = await response.json();
+
+            if (orders.length > 0) {
+              const tableHeader = document.createElement('h2');
+              tableHeader.textContent = `Table ${tableNumber} Orders:`;
+              ordersContainer.appendChild(tableHeader);
+
+              orders.forEach((order, index) => {
+                const orderDiv = document.createElement('div');
+                orderDiv.innerHTML = `<p>${order.dishName} - $${order.price} <button onclick="deleteOrder('${tableKey}', '${order._id}')">Delete</button></p>`;
+                ordersContainer.appendChild(orderDiv);
+              });
+
+              const totalAmount = orders.reduce((total, order) => total + parseFloat(order.price), 0);
+              const totalDiv = document.createElement('p');
+              totalDiv.innerHTML = `<strong>Total: $${totalAmount.toFixed(2)}</strong>`;
+              ordersContainer.appendChild(totalDiv);
+            }
+          } else {
+            console.error(`Error fetching orders for ${tableKey}`);
+          }
+        } catch (error) {
+          console.error('Error fetching orders:', error);
+        }
+      }
+      displayOrders();
+    }
+
+    async function deleteOrder(tableKey, orderId) {
+      try {
+        const response = await axios.delete(`${apiUrl}/${tableKey}/${orderId}`);
+
+        if (response.status === 200) {
+          await syncLocalStorageWithApi();
+          displayOrders();
+        } else {
+          console.error('Error deleting order.');
+        }
+      } catch (error) {
+        console.error('Error deleting order:', error);
+      }
+    }
+
+    async function init() {
+      await syncLocalStorageWithApi();
+      displayOrders();
+    }
+
+    init(); // Initial synchronization and display on page load
+  </script>
+</body>
+</html>
